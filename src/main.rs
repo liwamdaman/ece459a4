@@ -66,7 +66,7 @@ fn hackathon(args: &Args) {
     let pkg_names = fs::read_to_string("data/packages.txt").unwrap();
     let mut pkg_names_iter = pkg_names.lines().cycle();
 
-    let mut num_pkgs_generated = 0; // We can keep this around for now for the assert_eq! call
+    let mut num_pkgs_generated = 0; // We can keep this around for now for the assertion
     for i in 0..args.num_pkg_gen {
         let num_pkgs_per_pkg_downloader = per_thread_amount(i, args.num_pkgs, args.num_pkg_gen);
         let mut pkgs_for_pkg_downloader = vec![];
@@ -84,25 +84,30 @@ fn hackathon(args: &Args) {
 
     // Spawn idea generator threads. Ideas and packages are distributed evenly across threads. In
     // each thread, packages are distributed evenly across ideas.
-    let mut start_idx = 0;
+    let products = fs::read_to_string("data/ideas-products.txt").expect("file not found");
+    let customers = fs::read_to_string("data/ideas-customers.txt").expect("file not found");
+    let ideas = IdeaGenerator::cross_product(products, customers);
+    let ideas_arc = Arc::new(ideas);
+    let mut num_ideas_generated = 0;
     for i in 0..args.num_idea_gen {
         let num_ideas = per_thread_amount(i, args.num_ideas, args.num_idea_gen);
         let num_pkgs = per_thread_amount(i, args.num_pkgs, args.num_idea_gen);
         let num_students = per_thread_amount(i, args.num_students, args.num_idea_gen);
         let generator = IdeaGenerator::new(
-            start_idx,
+            num_ideas_generated,
             num_ideas,
             num_students,
             num_pkgs,
             Sender::clone(&send),
         );
         let idea_checksum = Arc::clone(&idea_checksum);
-        start_idx += num_ideas;
+        let ideas_arc = Arc::clone(&ideas_arc);
+        num_ideas_generated += num_ideas;
 
-        let thread = spawn(move || generator.run(idea_checksum));
+        let thread = spawn(move || generator.run(idea_checksum, ideas_arc));
         threads.push(thread);
     }
-    assert_eq!(start_idx, args.num_ideas);
+    assert_eq!(num_ideas_generated, args.num_ideas);
 
     // Join all threads
     threads.into_iter().for_each(|t| t.join().unwrap());

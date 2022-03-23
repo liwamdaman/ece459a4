@@ -1,7 +1,6 @@
 use super::checksum::Checksum;
 use super::Event;
 use crossbeam::channel::Sender;
-use std::fs;
 use std::sync::{Arc, Mutex};
 
 pub struct Idea {
@@ -35,29 +34,27 @@ impl IdeaGenerator {
     }
 
     // Idea names are generated from cross products between product names and customer names
-    fn get_next_idea_name(idx: usize) -> String {
-        let products = fs::read_to_string("data/ideas-products.txt").expect("file not found");
-        let customers = fs::read_to_string("data/ideas-customers.txt").expect("file not found");
-        let ideas = Self::cross_product(products, customers);
-        let pair = &ideas[idx % ideas.len()];
+    fn get_next_idea_name(idx: usize, ideas: &Vec<(String, String)>) -> String {
+        // let pair = ideas[idx % ideas.len()];
+        let pair = ideas.get(idx % ideas.len()).unwrap();
         format!("{} for {}", pair.0, pair.1)
     }
 
-    fn cross_product(products: String, customers: String) -> Vec<(String, String)> {
+    pub fn cross_product(products: String, customers: String) -> Vec<(String, String)> {
         products
             .lines()
             .flat_map(|p| customers.lines().map(move |c| (p.to_owned(), c.to_owned())))
             .collect()
     }
 
-    pub fn run(&self, idea_checksum: Arc<Mutex<Checksum>>) {
+    pub fn run(&self, idea_checksum: Arc<Mutex<Checksum>>, ideas: Arc<Vec<(String, String)>>) {
         let pkg_per_idea = self.num_pkgs / self.num_ideas;
         let extra_pkgs = self.num_pkgs % self.num_ideas;
 
         // Generate a set of new ideas and place them into the event-queue
         // Update the idea checksum with all generated idea names
         for i in 0..self.num_ideas {
-            let name = Self::get_next_idea_name(self.idea_start_idx + i);
+            let name = Self::get_next_idea_name(self.idea_start_idx + i, ideas.as_ref());
             let extra = (i < extra_pkgs) as usize;
             let num_pkg_required = pkg_per_idea + extra;
             let idea = Idea {
