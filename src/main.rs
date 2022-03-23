@@ -3,7 +3,7 @@ use lab4::{
     checksum::Checksum, idea::IdeaGenerator, package::PackageDownloader, student::Student, Event,
 };
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use std::env;
+use std::{env, fs};
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread::spawn;
@@ -63,17 +63,24 @@ fn hackathon(args: &Args) {
     }
 
     // Spawn package downloader threads. Packages are distributed evenly across threads.
-    let mut start_idx = 0;
+    let pkg_names = fs::read_to_string("data/packages.txt").unwrap();
+    let mut pkg_names_iter = pkg_names.lines().cycle();
+
+    let mut num_pkgs_generated = 0; // We can keep this around for now for the assert_eq! call
     for i in 0..args.num_pkg_gen {
-        let num_pkgs = per_thread_amount(i, args.num_pkgs, args.num_pkg_gen);
-        let downloader = PackageDownloader::new(start_idx, num_pkgs, Sender::clone(&send));
+        let num_pkgs_per_pkg_downloader = per_thread_amount(i, args.num_pkgs, args.num_pkg_gen);
+        let mut pkgs_for_pkg_downloader = vec![];
+        for _j in 0..num_pkgs_per_pkg_downloader {
+            pkgs_for_pkg_downloader.push(pkg_names_iter.next().unwrap().to_owned());
+        }
+        let downloader = PackageDownloader::new(pkgs_for_pkg_downloader, Sender::clone(&send));
         let pkg_checksum = Arc::clone(&pkg_checksum);
-        start_idx += num_pkgs;
+        num_pkgs_generated += num_pkgs_per_pkg_downloader;
 
         let thread = spawn(move || downloader.run(pkg_checksum));
         threads.push(thread);
     }
-    assert_eq!(start_idx, args.num_pkgs);
+    assert_eq!(num_pkgs_generated, args.num_pkgs);
 
     // Spawn idea generator threads. Ideas and packages are distributed evenly across threads. In
     // each thread, packages are distributed evenly across ideas.
