@@ -52,6 +52,7 @@ impl IdeaGenerator {
 
         // Generate a set of new ideas and place them into the event-queue
         // Update the idea checksum with all generated idea names
+        let mut checksum_xor_temp = Checksum::default();
         for i in 0..self.num_ideas {
             let name = Self::get_next_idea_name(self.idea_start_idx + i, ideas.as_ref());
             let extra = (i < extra_pkgs) as usize;
@@ -61,6 +62,8 @@ impl IdeaGenerator {
                 num_pkg_required,
             };
 
+            checksum_xor_temp.update(Checksum::with_sha256(&idea.name));
+
             idea_checksum
                 .lock()
                 .unwrap()
@@ -68,6 +71,10 @@ impl IdeaGenerator {
 
             self.ideas_event_sender.send(IdeasEvent { idea: Some(idea) }).unwrap();
         }
+        idea_checksum
+            .lock()
+            .unwrap()
+            .update(checksum_xor_temp);
 
         // Push student termination events into the event queue
         for _ in 0..self.num_students {

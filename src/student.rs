@@ -53,11 +53,13 @@ impl Student {
                 }
                 let pkg_checksum_copy_for_print;
                 let pkgs_used = self.pkgs.drain(0..pkgs_required).collect::<Vec<_>>();
+                let mut checksum_xor_temp = Checksum::default();
+                for pkg in pkgs_used.iter() {
+                    checksum_xor_temp.update(Checksum::with_sha256(&pkg.name));
+                }
                 {
                     let mut pkg_checksum = pkg_checksum.lock().unwrap();
-                    for pkg in pkgs_used.iter() {
-                        pkg_checksum.update(Checksum::with_sha256(&pkg.name));
-                    }
+                    pkg_checksum.update(checksum_xor_temp);
                     pkg_checksum_copy_for_print = pkg_checksum.to_string();
                 }
 
