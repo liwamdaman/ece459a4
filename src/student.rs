@@ -33,22 +33,29 @@ impl Student {
             // Can only build ideas if we have acquired sufficient packages
             let pkgs_required = idea.num_pkg_required;
             if pkgs_required <= self.pkgs.len() {
-                let (mut idea_checksum, mut pkg_checksum) =
-                    (idea_checksum.lock().unwrap(), pkg_checksum.lock().unwrap());
-
                 // Update idea and package checksums
                 // All of the packages used in the update are deleted, along with the idea
-                idea_checksum.update(Checksum::with_sha256(&idea.name));
+                let idea_checksum_copy_for_print;
+                {
+                    let mut idea_checksum = idea_checksum.lock().unwrap();
+                    idea_checksum.update(Checksum::with_sha256(&idea.name));
+                    idea_checksum_copy_for_print = idea_checksum.to_string();
+                }
+                let pkg_checksum_copy_for_print;
                 let pkgs_used = self.pkgs.drain(0..pkgs_required).collect::<Vec<_>>();
-                for pkg in pkgs_used.iter() {
-                    pkg_checksum.update(Checksum::with_sha256(&pkg.name));
+                {
+                    let mut pkg_checksum = pkg_checksum.lock().unwrap();
+                    for pkg in pkgs_used.iter() {
+                        pkg_checksum.update(Checksum::with_sha256(&pkg.name));
+                    }
+                    pkg_checksum_copy_for_print = pkg_checksum.to_string();
                 }
 
                 // We want the subsequent prints to be together, so we lock stdout
                 let stdout = stdout();
                 let mut handle = stdout.lock();
                 writeln!(handle, "\nStudent {} built {} using {} packages\nIdea checksum: {}\nPackage checksum: {}",
-                    self.id, idea.name, pkgs_required, idea_checksum, pkg_checksum).unwrap();
+                    self.id, idea.name, pkgs_required, idea_checksum_copy_for_print, pkg_checksum_copy_for_print).unwrap();
                 for pkg in pkgs_used.iter() {
                     writeln!(handle, "> {}", pkg.name).unwrap();
                 }

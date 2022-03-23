@@ -35,7 +35,6 @@ impl IdeaGenerator {
 
     // Idea names are generated from cross products between product names and customer names
     fn get_next_idea_name(idx: usize, ideas: &Vec<(String, String)>) -> String {
-        // let pair = ideas[idx % ideas.len()];
         let pair = ideas.get(idx % ideas.len()).unwrap();
         format!("{} for {}", pair.0, pair.1)
     }
