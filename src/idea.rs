@@ -1,5 +1,5 @@
 use super::checksum::Checksum;
-use super::Event;
+use super::IdeasEvent;
 use crossbeam::channel::Sender;
 use std::sync::{Arc, Mutex};
 
@@ -13,7 +13,7 @@ pub struct IdeaGenerator {
     num_ideas: usize,
     num_students: usize,
     num_pkgs: usize,
-    event_sender: Sender<Event>,
+    ideas_event_sender: Sender<IdeasEvent>
 }
 
 impl IdeaGenerator {
@@ -22,14 +22,14 @@ impl IdeaGenerator {
         num_ideas: usize,
         num_students: usize,
         num_pkgs: usize,
-        event_sender: Sender<Event>,
+        ideas_event_sender: Sender<IdeasEvent>
     ) -> Self {
         Self {
             idea_start_idx,
             num_ideas,
             num_students,
             num_pkgs,
-            event_sender,
+            ideas_event_sender
         }
     }
 
@@ -66,12 +66,12 @@ impl IdeaGenerator {
                 .unwrap()
                 .update(Checksum::with_sha256(&idea.name));
 
-            self.event_sender.send(Event::NewIdea(idea)).unwrap();
+            self.ideas_event_sender.send(IdeasEvent { idea: Some(idea) }).unwrap();
         }
 
         // Push student termination events into the event queue
         for _ in 0..self.num_students {
-            self.event_sender.send(Event::OutOfIdeas).unwrap();
+            self.ideas_event_sender.send(IdeasEvent { idea: None }).unwrap();
         }
     }
 }

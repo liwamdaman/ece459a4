@@ -1,5 +1,5 @@
 use super::checksum::Checksum;
-use super::Event;
+use super::DownloadCompleteEvent;
 use crossbeam::channel::Sender;
 use std::sync::{Arc, Mutex};
 
@@ -9,14 +9,14 @@ pub struct Package {
 
 pub struct PackageDownloader {
     pkgs: Vec<String>,
-    event_sender: Sender<Event>,
+    download_complete_event_sender: Sender<DownloadCompleteEvent>,
 }
 
 impl PackageDownloader {
-    pub fn new(pkgs: Vec<String>, event_sender: Sender<Event>) -> Self {
+    pub fn new(pkgs: Vec<String>, download_complete_event_sender: Sender<DownloadCompleteEvent>) -> Self {
         Self {
             pkgs,
-            event_sender,
+            download_complete_event_sender,
         }
     }
 
@@ -28,8 +28,8 @@ impl PackageDownloader {
                 .lock()
                 .unwrap()
                 .update(Checksum::with_sha256(&name));
-            self.event_sender
-                .send(Event::DownloadComplete(Package { name }))
+            self.download_complete_event_sender
+                .send(DownloadCompleteEvent { package: Package { name } })
                 .unwrap();
         }
     }

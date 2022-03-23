@@ -1,7 +1,5 @@
 #![warn(clippy::all)]
-use lab4::{
-    checksum::Checksum, idea::IdeaGenerator, package::PackageDownloader, student::Student, Event,
-};
+use lab4::{checksum::Checksum, idea::IdeaGenerator, package::PackageDownloader, student::Student, DownloadCompleteEvent, IdeasEvent};
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use std::{env, fs};
 use std::error::Error;
@@ -42,8 +40,9 @@ fn per_thread_amount(thread_idx: usize, total: usize, threads: usize) -> usize {
 }
 
 fn hackathon(args: &Args) {
-    // Use message-passing channel as event queue
-    let (send, recv) = unbounded::<Event>();
+    // Use message-passing channels as event queues
+    let (send_ideas, recv_ideas) = unbounded::<IdeasEvent>();
+    let (send_download_complete, recv_download_complete) = unbounded::<DownloadCompleteEvent>();
     let mut threads = vec![];
     // Checksums of all the generated ideas and packages
     let mut idea_checksum = Arc::new(Mutex::new(Checksum::default()));
@@ -55,7 +54,13 @@ fn hackathon(args: &Args) {
 
     // Spawn student threads
     for i in 0..args.num_students {
-        let mut student = Student::new(i, Sender::clone(&send), Receiver::clone(&recv));
+        let mut student = Student::new(
+            i,
+            Sender::clone(&send_ideas),
+            Receiver::clone(&recv_ideas),
+            Sender::clone(&send_download_complete),
+            Receiver::clone(&recv_download_complete)
+        );
         let student_idea_checksum = Arc::clone(&student_idea_checksum);
         let student_pkg_checksum = Arc::clone(&student_pkg_checksum);
         let thread = spawn(move || student.run(student_idea_checksum, student_pkg_checksum));
@@ -73,7 +78,7 @@ fn hackathon(args: &Args) {
         for _j in 0..num_pkgs_per_pkg_downloader {
             pkgs_for_pkg_downloader.push(pkg_names_iter.next().unwrap().to_owned());
         }
-        let downloader = PackageDownloader::new(pkgs_for_pkg_downloader, Sender::clone(&send));
+        let downloader = PackageDownloader::new(pkgs_for_pkg_downloader, Sender::clone(&send_download_complete));
         let pkg_checksum = Arc::clone(&pkg_checksum);
         num_pkgs_generated += num_pkgs_per_pkg_downloader;
 
@@ -98,7 +103,7 @@ fn hackathon(args: &Args) {
             num_ideas,
             num_students,
             num_pkgs,
-            Sender::clone(&send),
+            Sender::clone(&send_ideas)
         );
         let idea_checksum = Arc::clone(&idea_checksum);
         let ideas_arc = Arc::clone(&ideas_arc);

@@ -7,11 +7,12 @@ pub mod student;
 use idea::Idea;
 use package::Package;
 
-pub enum Event {
-    // Newly generated idea for students to work on
-    NewIdea(Idea),
-    // Termination event for student threads
-    OutOfIdeas,
-    // Packages that students can take to work on their ideas
-    DownloadComplete(Package),
+// Some means newly generated idea for students to work on, None means termination event for student threads
+pub struct IdeasEvent {
+    pub idea: Option<Idea>
+}
+
+// Packages that students can take to work on their ideas
+pub struct DownloadCompleteEvent {
+    pub package: Package
 }
