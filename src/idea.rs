@@ -64,11 +64,6 @@ impl IdeaGenerator {
 
             checksum_xor_temp.update(Checksum::with_sha256(&idea.name));
 
-            idea_checksum
-                .lock()
-                .unwrap()
-                .update(Checksum::with_sha256(&idea.name));
-
             self.ideas_event_sender.send(IdeasEvent { idea: Some(idea) }).unwrap();
         }
         idea_checksum
