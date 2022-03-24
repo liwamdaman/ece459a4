@@ -5,6 +5,7 @@ use std::{env, fs};
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread::spawn;
+use lab4::printer::Printer;
 
 struct Args {
     pub num_ideas: usize,
@@ -43,6 +44,7 @@ fn hackathon(args: &Args) {
     // Use message-passing channels as event queues
     let (send_ideas, recv_ideas) = unbounded::<IdeasEvent>();
     let (send_download_complete, recv_download_complete) = unbounded::<DownloadCompleteEvent>();
+    let (send_print, recv_print) = unbounded::<String>();
     let mut threads = vec![];
     // Checksums of all the generated ideas and packages
     let mut idea_checksum = Arc::new(Mutex::new(Checksum::default()));
@@ -59,7 +61,8 @@ fn hackathon(args: &Args) {
             Sender::clone(&send_ideas),
             Receiver::clone(&recv_ideas),
             Sender::clone(&send_download_complete),
-            Receiver::clone(&recv_download_complete)
+            Receiver::clone(&recv_download_complete),
+            Sender::clone(&send_print),
         );
         let student_idea_checksum = Arc::clone(&student_idea_checksum);
         let student_pkg_checksum = Arc::clone(&student_pkg_checksum);
@@ -113,6 +116,13 @@ fn hackathon(args: &Args) {
         threads.push(thread);
     }
     assert_eq!(num_ideas_generated, args.num_ideas);
+
+    // Spawn printing threads
+    for _i in 0..args.num_students {
+        let printer = Printer::new(Receiver::clone(&recv_print));
+        let thread = spawn(move || printer.run());
+        threads.push(thread);
+    }
 
     // Join all threads
     threads.into_iter().for_each(|t| t.join().unwrap());

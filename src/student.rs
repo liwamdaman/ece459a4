@@ -1,6 +1,5 @@
 use super::{checksum::Checksum, idea::Idea, package::Package, DownloadCompleteEvent, IdeasEvent};
 use crossbeam::channel::{Receiver, Sender};
-use std::io::{stdout, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct Student {
@@ -12,6 +11,7 @@ pub struct Student {
     ideas_event_recv: Receiver<IdeasEvent>,
     download_complete_event_sender: Sender<DownloadCompleteEvent>,
     download_complete_event_recv: Receiver<DownloadCompleteEvent>,
+    print_sender: Sender<String>
 }
 
 impl Student {
@@ -21,6 +21,7 @@ impl Student {
         ideas_event_recv: Receiver<IdeasEvent>,
         download_complete_event_sender: Sender<DownloadCompleteEvent>,
         download_complete_event_recv: Receiver<DownloadCompleteEvent>,
+        print_sender: Sender<String>
     ) -> Self {
         Self {
             id,
@@ -28,6 +29,7 @@ impl Student {
             ideas_event_recv,
             download_complete_event_sender,
             download_complete_event_recv,
+            print_sender,
             idea: None,
             pkgs: vec![],
             skipped_idea: false,
@@ -63,14 +65,13 @@ impl Student {
                     pkg_checksum_copy_for_print = pkg_checksum.to_string();
                 }
 
-                // We want the subsequent prints to be together, so we lock stdout
-                let stdout = stdout();
-                let mut handle = stdout.lock();
-                writeln!(handle, "\nStudent {} built {} using {} packages\nIdea checksum: {}\nPackage checksum: {}",
-                    self.id, idea.name, pkgs_required, idea_checksum_copy_for_print, pkg_checksum_copy_for_print).unwrap();
+                // Send message to print to printing thread
+                let mut student_print = format!("\nStudent {} built {} using {} packages\nIdea checksum: {}\nPackage checksum: {}",
+                                        self.id, idea.name, pkgs_required, idea_checksum_copy_for_print, pkg_checksum_copy_for_print);
                 for pkg in pkgs_used.iter() {
-                    writeln!(handle, "> {}", pkg.name).unwrap();
+                    student_print.push_str(format!("\n> {}", pkg.name).as_str());
                 }
+                self.print_sender.send(student_print).unwrap();
 
                 self.idea = None;
             }
@@ -109,6 +110,8 @@ impl Student {
                                         .send(DownloadCompleteEvent { package: pkg })
                                         .unwrap();
                                 }
+                                // Send message to kill the corresponding printing thread
+                                self.print_sender.send(String::new()).unwrap();
                                 return;
                             }
                         }

@@ -3,6 +3,7 @@ pub mod checksum;
 pub mod idea;
 pub mod package;
 pub mod student;
+pub mod printer;
 
 use idea::Idea;
 use package::Package;
